@@ -19,6 +19,25 @@
 - **Alternatives considered**: An offer-selection screen — deferred until RSI defines the
   prioritization rule, to avoid inventing product policy.
 
+### #3 — Multi-entity parametrization ("build once, deploy to many")
+- **Decision**: Ship a single common journey whose per-entity differences (brand, product catalog,
+  legal-text templates, locale) are resolved through an EntityConfiguration layer (MCP-T09); the
+  MVP seeds ≥2 entities to prove parametrization. No per-entity code path.
+- **Rationale**: Ruralvía serves ~30 autonomous credit unions of Grupo Caja Rural over a common
+  channel and the common IRIS core; forking per entity multiplies core-regression risk and defeats
+  the pilot's mandate (Contexto_Idiosincrasia BR-ORG-01..09; Constitution Principle VII).
+- **Alternatives considered**: Per-entity forks or a single hard-coded entity — rejected as
+  contradicting the platform reality and the replicability goal.
+
+### #4 — Legal baseline and CCD2 transition
+- **Decision**: Build to Ley 16/2011 while keeping the controls (SECCI/INE, solvency, 14-day
+  withdrawal, early repayment, TAE) valid under CCD2 (Directive (UE) 2023/2225, application
+  20-Nov-2026). Exact Spanish transposition date to confirm with RSI.
+- **Rationale**: CCD2 preserves and reinforces these obligations; designing to survive the
+  transition avoids rework (Marco_Legal_Lending_UE_Espana §1.1).
+- **Alternatives considered**: Ignoring CCD2 for MVP — rejected because application lands within
+  the pilot horizon.
+
 ## Tech-stack resolution
 - **Platform = ICA (Context Studio + SDLC Agentic App)** — Decision: build within the named
   platform context. Source: Project context (the functional spec names it as the pilot platform).
@@ -34,7 +53,8 @@
 ## Scope-boundary decisions
 - **Orphaned upstream dependency (Pattern 2):** every in-scope agent's inputs are produced either
   by an upstream in-scope agent or by a mocked external system, so no orphan exists — seed
-  fixtures supply offers, accounts, pricing, documents, verification, and SCA outcomes (data-model.md).
+  fixtures supply entity configuration, offers, accounts, pricing, documents, verification, and SCA
+  outcomes (data-model.md).
 - **Mid-stream scope cut (Pattern 1):** the disbursement output (loan + schedule) is consumed by
   the confirmation screen (in scope); post-contracting management (US3) is the deferred consumer,
   terminating the MVP at `ACTIVO`.
