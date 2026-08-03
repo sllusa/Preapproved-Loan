@@ -7,7 +7,10 @@ Deliver a fully digital, mobile-first web journey that lets an eligible Ruralví
 discover a live pre-approved offer, simulate amount and term with transparent figures, accept
 the precontractual documentation, pass verifications, sign with SCA, and receive an idempotent
 disbursement with an amortization schedule. The MVP builds the P1 end-to-end thread as a set of
-synthesized agents orchestrated over the loan lifecycle, with every external system mocked.
+synthesized agents orchestrated over the loan lifecycle, with every external system mocked. The
+journey is a single common implementation parameterized per entity ("build once, deploy to many"):
+brand, product catalog, legal-text templates, and locale enter through EntityConfiguration, and
+the MVP seeds at least two entities to prove parametrization without forking the flow.
 
 ## Technical Context
 **Language/Version**: Python 3.11 — Source: Decided by user
@@ -34,6 +37,7 @@ synthesized agents orchestrated over the loan lifecycle, with every external sys
 | IV. Verifications Gate Digital Closure | AGT-04 must pass before AGT-05; failure sets `route_to_human` and stops digital closure (BR-09). |
 | V. Only Live Offers May Originate a Loan | AGT-01 exposes the journey only for OFERTA_VIGENTE; orchestrator stops on expiry/revocation (BR-01/BR-12). |
 | VI. Simulation Must Stay Within the Offer | AGT-02 clamps amount/term to the offer (BR-02/BR-03, FV-01/FV-02). |
+| VII. Build Once, Parameterize Per Entity | AGT-01 resolves `entity_config` via MCP-T09 and gates exposure on it (BR-15); a single flow drives all entities, params only (BR-16); AGT-07 stamps the entity on audited events. |
 | Compliance — rights disclosure | Shown by AGT-03 before signature (BR-11). |
 | Compliance — accessibility (WCAG 2.1 AA) | React screens built to keyboard/screen-reader operability; formal audit deferred. |
 | Compliance — data protection / scoring | Verification inputs minimized; no sensitive data in logs. |
@@ -71,9 +75,11 @@ All external systems are MOCK for this iteration:
 - **Core banking / disbursement (MCP-T06) — the only "hard" integration in production:** in-memory stub recording credits by `idempotency_key` and returning the same result on repeat, so double-credit is provably impossible; the real RSI core is the single deferred hard integration.
 - **Account lookup (MCP-T07):** fixture account rows, including a non-operable-account case.
 - **Notifications (MCP-T08):** no-op sink recording the confirmation payload.
+- **Entity configuration (MCP-T09):** seed configs for at least two entities (brand, catalog, legal templates, locale), so the same flow renders each entity's brand/limits/rates/texts from parameters alone.
 
 Fixture *shapes* live in data-model.md. Variety to cover: a happy-path customer (Marta), a
 verification-fail customer routed to human (Andrés), a senior accessibility/resume case (Rosa), a
-no-operable-account case, and an expired-offer case.
+no-operable-account case, an expired-offer case, and customers spread across two entities so the
+parametrization (SC-006) is exercised.
 
 <!-- No production auth/secrets, memory tier, or eval harness in this MVP; they are deferred. -->

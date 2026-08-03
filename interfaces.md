@@ -17,15 +17,18 @@
 ## Agent specifications
 
 ### AGT-01 — Offer Discovery Agent (BUILD)
-Retrieves the customer's live pre-approved offer from the mocked offer/scoring engine and
-determines whether the journey should be exposed at all. It surfaces the offer detail — maximum
-amount, indicative term, nominal rate, and validity — and refuses to expose the journey when no
-live offer exists. It is the gatekeeper that enforces "only live offers may originate a loan."
+Resolves the customer's entity configuration, retrieves the customer's live pre-approved offer from
+the mocked offer/scoring engine, and determines whether the journey should be exposed at all. It
+surfaces the offer detail — maximum amount, indicative term, nominal rate, and validity — and
+refuses to expose the journey when no live offer exists **or** when the entity has no valid
+configuration. It is the gatekeeper that enforces "only live offers may originate a loan" (BR-01)
+and "build once, parameterize per entity" (BR-15).
 
 **Inputs:**
 - `customer_id` (str) [synthesized] — the customer requesting the journey
 
 **Outputs:**
+- `entity_config` (EntityConfigurationRecord) [synthesized] — the resolved per-entity configuration
 - `offer` (PreApprovedOfferRecord) [synthesized] — the live offer, if any
 - `journey_available` (bool) [synthesized] — whether the journey may be shown
 
@@ -36,7 +39,8 @@ cost. It recomputes on every change and returns the rate with and without relati
 applicable, so the simulation screen can display transparent figures in real time.
 
 **Inputs:**
-- `offer` (PreApprovedOfferRecord) [synthesized] — the live offer providing limits
+- `offer` (PreApprovedOfferRecord) [synthesized] — the live offer providing the upper limits
+- `entity_config` (EntityConfigurationRecord) [synthesized] — product minimums, fees, and bonus policy
 - `requested_amount` (decimal) [synthesized] — customer's requested amount
 - `requested_term_months` (int) [synthesized] — customer's requested term
 
@@ -103,10 +107,13 @@ acceptance, signature, and disbursement events to the audit trail.
 - `schedule` (AmortizationSchedule) [synthesized] — the generated amortization schedule
 
 ### AGT-07 — Journey Orchestrator (BUILD)
-Sequences the agents across the loan lifecycle, holds the shared journey state so a customer can
+Sequences the agents across the loan lifecycle, holds the shared journey state (including the
+resolved `entity_config`, so brand/catalog/legal texts/locale flow to every step) so a customer can
 save and resume (including across app and web), and enforces the ordering constraints between
 steps — precontractual before signature, verifications before signature, signature before
-disbursement. It stops the flow when the offer expires or is revoked before the signed state.
+disbursement. It stops the flow when the offer expires or is revoked before the signed state, and
+it keeps the common regulatory baseline invariant across entities (BR-16) while stamping the
+resolved entity on every audited event.
 
 **Inputs:**
 - `customer_id` (str) [synthesized] — the customer whose journey is orchestrated
@@ -130,6 +137,7 @@ disbursement. It stops the flow when the offer expires or is revoked before the 
 | MCP-T06 | Core Banking Disbursement | AGT-06 | MOCK |
 | MCP-T07 | Account Lookup | AGT-06 | MOCK |
 | MCP-T08 | Notification Sender | AGT-06 | MOCK |
+| MCP-T09 | Entity Configuration Provider | AGT-01, AGT-07 | MOCK |
 
 ## Tool specifications
 
@@ -237,6 +245,19 @@ Sends the confirmation notification/email.
 **Backend strategy:** MOCK — a no-op sink recording the payload; the real notification service is
 deferred.
 
+### MCP-T09 — Entity Configuration Provider (MOCK)
+Resolves a customer's entity configuration (brand, product catalog, legal-text templates, locale,
+feature flags) that particularizes the single common journey.
+
+**Inputs:**
+- `customer_id` (str) [synthesized] — the customer (resolves to an entity)
+
+**Outputs:**
+- `entity_config` (Optional[EntityConfigurationRecord]) [synthesized] — the resolved configuration, if valid
+
+**Backend strategy:** MOCK — returns `EntityConfigurationRecord` rows from seed fixtures keyed by
+entity (at least two entities seeded); the real per-entity configuration/catalog service is deferred.
+
 # Business Rules & Validation Logic: Pre-Approved Loan Journey
 
 ## Journey Business Rules (BR-01–BR-14)
@@ -246,8 +267,8 @@ orchestrator (AGT-07) and the step agents named per rule.
 | ID | Name | Inputs | Pass condition | Failure severity |
 |----|------|--------|----------------|------------------|
 | BR-01 | Live offer required | offer.status | equals OFERTA_VIGENTE | Hard block |
-| BR-02 | Amount within offer | requested_amount, offer.max_amount, product_min | product_min ≤ amount ≤ offer.max_amount | Auto-correct and warn |
-| BR-03 | Term within offer | requested_term_months, offer.max_term_months, product_min_term | product_min_term ≤ term ≤ offer.max_term_months | Auto-correct and warn |
+| BR-02 | Amount within offer | requested_amount, offer.max_amount, entity_config.product_min_amount | product_min_amount ≤ amount ≤ offer.max_amount | Auto-correct and warn |
+| BR-03 | Term within offer | requested_term_months, offer.max_term_months, entity_config.product_min_term_months | product_min_term_months ≤ term ≤ offer.max_term_months | Auto-correct and warn |
 | BR-04 | Recalc on change | requested_amount, requested_term_months | simulation figures recomputed on every change | Hard block |
 | BR-05 | Rate with/without bonus | customer.has_relationship_bonus | both rates shown when a bonus applies | Soft warn |
 | BR-06 | Precontractual before signature | document.accepted_at | non-null before signature | Hard block |
@@ -258,25 +279,32 @@ orchestrator (AGT-07) and the step agents named per rule.
 | BR-11 | Rights disclosure | withdrawal_shown, early_repayment_shown | both shown before signature | Hard block |
 | BR-12 | Offer live during flow | offer.status | remains OFERTA_VIGENTE until FIRMADO | Hard block |
 | BR-13 | Save and resume | offer.status | simulation resumable while offer live | Soft warn |
-| BR-14 | Audit trail | acceptance, signature, disbursement events | all recorded immutably | Hard block |
+| BR-14 | Audit trail | acceptance, signature, disbursement events + entity_id | all recorded immutably, segmentable per entity | Hard block |
+| BR-15 | Entity configuration required | entity_config | valid resolved config before journey exposed | Hard block |
+| BR-16 | Common baseline invariant | entity_config, regulatory controls | per-entity params never weaken BR-06/07/08/09/11/14 | Hard block |
 
 ## Field Validation Rules
 Field-level checks applied on input.
 
 | ID | Name | Inputs | Pass condition | Failure severity |
 |----|------|--------|----------------|------------------|
-| FV-01 | Amount numeric & bounded | requested_amount, product_min, offer.max_amount | numeric and within bounds | Hard block |
+| FV-01 | Amount numeric & bounded | requested_amount, entity_config.product_min_amount, offer.max_amount | numeric and within bounds | Hard block |
 | FV-02 | Term integer & bounded | requested_term_months | integer within bounds, coherent with amount | Hard block |
 | FV-03 | Account belongs to customer | disbursement_account, customer.account_ids | account is in the customer's set | Hard block |
 | FV-04 | Documentation accepted | document.accepted_at | non-null before signature | Hard block |
 | FV-05 | SCA attempts bounded | sca_attempt_count | ≤ 3 attempts [inferred — confirm with stakeholder] | Route to HITL |
 
-**Product minimums:** minimum amount 1.000 € and minimum term 12 months [inferred — confirm with
-stakeholder]; the SCA retry ceiling of 3 attempts is [inferred — confirm with stakeholder].
+**Product minimums:** supplied per entity via `entity_config` (reference values: minimum amount
+1.000 € and minimum term 12 months) [inferred — confirm per-entity catalog with RSI]; the SCA retry
+ceiling of 3 attempts is [inferred — confirm with stakeholder].
 
 # UI Contracts: Pre-Approved Loan Journey
 
 **Primary surface:** Web app (with mobile parity)
+
+**Per-entity presentation:** every screen renders brand/theme, locale, and legal-text templates
+from the resolved `entity_config` (BR-15). The screen set and flow are identical across entities;
+only these parameters vary. No screen is forked per entity.
 
 ## Screens
 

@@ -11,7 +11,8 @@ timestamp, BEFORE any signature can begin. The system MUST NOT allow the signatu
 start while acceptance of the precontractual documentation is unrecorded.
 **Rationale:** Ley 16/2011 (consumer credit) makes standardized precontractual disclosure a
 legal precondition of contracting; skipping it voids the transparency guarantee and exposes
-the entity to regulatory sanction.
+the entity to regulatory sanction. The successor CCD2 (Directive (UE) 2023/2225, applying from
+20-Nov-2026) preserves and reinforces this precondition — the control MUST survive that transition.
 
 ### II. Strong Customer Authentication Is Mandatory
 The system MUST complete a successful PSD2 Strong Customer Authentication (SCA) before a loan
@@ -48,6 +49,19 @@ configure or advance a loan whose amount or term exceeds the offer's limits.
 **Rationale:** The offer's amount and term are the boundaries of the pre-approved credit
 decision; exceeding them turns a pre-approved product into an un-underwritten one.
 
+### VII. Build Once, Parameterize Per Entity
+The journey MUST be a single, common implementation (one flow, one rule set, one IRIS
+integration) whose per-entity differences — brand, product catalog (amount/term limits, TIN,
+fees, relationship bonus), legal-text templates, and locale — are resolved **only** through a
+per-entity configuration layer, never through forked code. The system MUST NOT expose or
+originate a loan for an entity without a valid, resolved configuration. The common regulatory
+baseline (Ley 16/2011, PSD2, RGPD, DORA) is invariant and MUST NOT be weakened by any per-entity
+parameter.
+**Rationale:** Ruralvía is a multi-entity platform serving ~30 autonomous credit unions of Grupo
+Caja Rural over a common channel and a common core (IRIS); fragmenting into per-entity codebases
+would multiply core-regression risk and defeat the "build once, deploy to many" mandate that
+justifies the pilot.
+
 ## Compliance & Hard Constraints
 
 - **Precontractual rights disclosure:** The system MUST inform the customer of the right of
@@ -62,12 +76,17 @@ decision; exceeding them turns a pre-approved product into an un-underwritten on
   immutable audit trail (who, what, when).
 - **Eligible disbursement account:** The disbursement account MUST be an account the customer
   holds at the entity, active and operable.
+- **Legal baseline & transition:** The consumer-credit baseline is Ley 16/2011 (transposing
+  Directive 2008/48/CE), transitioning to **CCD2 (Directive (UE) 2023/2225, application 20-Nov-2026)**.
+  Precontractual disclosure (SECCI/INE), the solvency evaluation, the 14-day right of withdrawal,
+  early repayment, and TAE MUST hold under both frames. The exact Spanish transposition date is to
+  be confirmed with RSI.
 
 ## Reliability Posture
 
-Statistical performance and conversion targets (e.g. recálculo < 300 ms, conversion uplift,
-CSAT/NPS) are deferred to a later iteration that includes an eval/measurement harness. MVP
-acceptance is functional — see quickstart.md.
+Statistical performance and conversion targets (response-time, conversion uplift, CSAT/NPS) are
+deferred to a later iteration that includes an eval/measurement harness. MVP acceptance is
+functional — see quickstart.md.
 
 ## Governance
 
@@ -75,4 +94,9 @@ This constitution supersedes ad-hoc implementation choices. The `plan.md` Consti
 gate MUST pass before implementation begins. Amendments require re-running the spec generator
 against an updated functional specification.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-06 | **Source**: RSI / Ruralvía functional specification
+**Version**: 1.1.0 | **Ratified**: 2026-07-06 | **Last amended**: 2026-08-03 | **Source**: RSI / Ruralvía functional specification
+
+<!-- v1.1.0 — Added Principle VII (build once, parameterize per entity); added CCD2 (Directive
+(UE) 2023/2225) transition to Principle I and the legal-baseline constraint. This file is the
+single canonical constitution; the earlier constitution-v2.md draft has been folded in and removed. -->
+

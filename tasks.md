@@ -13,23 +13,25 @@ Tasks reference work by ID — `AGT-XX`, `MCP-TXX`, `BR-NN`/`FV-NN`, entities/en
 - T002 [P] Establish structured stdout logging and the audit-event recording convention (BR-14)
 
 ## Phase 2: Foundational (blocking)
-- T003 Define the data-model.md entities (CustomerRecord, PreApprovedOfferRecord, SimulationRecord, LoanRecord, AmortizationSchedule, Installment, PrecontractualDocument, VerificationResult, SignatureResult, DisbursementAccountRecord) and the shared enums (OfferStatus, LoanStatus) as common types
-- T004 Implement the AGT-07 Journey Orchestrator shell and the loan-lifecycle state machine per data-model.md, enforcing step ordering
-- T005 [P] Build the mocked external tools MCP-T01–MCP-T08 returning the fixture shapes in data-model.md
-- T006 [P] Author the seed fixtures (happy-path, verification-fail, senior/resume, no-operable-account, expired-offer)
-**Checkpoint:** shared model, orchestrator shell, and mocked tools in place; story work can begin.
+- T003 Define the data-model.md entities (EntityConfigurationRecord, CustomerRecord, PreApprovedOfferRecord, SimulationRecord, LoanRecord, AmortizationSchedule, Installment, PrecontractualDocument, VerificationResult, SignatureResult, DisbursementAccountRecord) and the shared enums (OfferStatus, LoanStatus) as common types
+- T004 Implement the AGT-07 Journey Orchestrator shell and the loan-lifecycle state machine per data-model.md, enforcing step ordering and carrying the resolved entity_config through the journey
+- T005 [P] Build the mocked external tools MCP-T01–MCP-T09 returning the fixture shapes in data-model.md
+- T006 [P] Author the seed fixtures (happy-path, verification-fail, senior/resume, no-operable-account, expired-offer) across at least two entity configurations
+- T006b [P] Author the per-entity EntityConfiguration fixtures (≥2 entities: brand, product catalog, legal-text templates, locale, feature flags) served by MCP-T09
+**Checkpoint:** shared model, orchestrator shell, entity configs, and mocked tools in place; story work can begin.
 
 ## Phase 3: User Story 1 — Contract a pre-approved loan end to end (P1) 🎯 MVP
 **Goal:** deliver the full digital origination thread from discovery to disbursement.
 **Independent Test:** run the happy-path fixture customer and confirm the loan reaches disbursed/active with a schedule and confirmation, every rule exercised.
-- T007 [US1] Implement AGT-01 (Offer Discovery) per its contracts/interfaces.md I/O; enforce BR-01/BR-12 via MCP-T01
-- T008 [US1] Implement AGT-02 (Simulation & Pricing) per its I/O; enforce BR-02–BR-05 and FV-01/FV-02 via MCP-T02 (depends on T007)
+- T007 [US1] Implement AGT-01 (Offer Discovery) per its interfaces.md I/O; resolve entity_config via MCP-T09 and enforce BR-01/BR-12/BR-15 via MCP-T01
+- T008 [US1] Implement AGT-02 (Simulation & Pricing) per its I/O; apply entity_config catalog/bonus and enforce BR-02–BR-05 and FV-01/FV-02 via MCP-T02 (depends on T007)
 - T009 [US1] Implement account selection using MCP-T07; enforce BR-10 and FV-03
 - T010 [US1] Implement AGT-03 (Precontractual) per its I/O; enforce BR-06, BR-11, FV-04 via MCP-T03 (depends on T008)
 - T011 [US1] Implement AGT-04 (Verification) per its I/O; enforce BR-09 via MCP-T04 (depends on T010)
 - T012 [US1] Implement AGT-05 (Signature/SCA) per its I/O; enforce BR-07 and FV-05 via MCP-T05 (depends on T011)
 - T013 [US1] Implement AGT-06 (Disbursement) per its I/O; enforce BR-08 idempotency and generate the AmortizationSchedule via MCP-T06/MCP-T07/MCP-T08 (depends on T012)
-- T014 [P] [US1] Build the UI Contracts screens (offer discovery, offer detail, simulation, summary & account, precontractual, verification status, signature, confirmation) consuming the agent outputs, keyboard/screen-reader operable
+- T014 [P] [US1] Build the UI Contracts screens (offer discovery, offer detail, simulation, summary & account, precontractual, verification status, signature, confirmation) consuming the agent outputs, themed/localized from entity_config (BR-15), keyboard/screen-reader operable
+- T014b [US1] Verify parametrization (SC-006): run US1 for fixture customers of two entities and confirm each renders its own brand, product limits/rates, and legal texts from configuration alone, with no per-entity code path
 **Checkpoint:** US1 is independently functional and testable end to end.
 
 ## Phase 4: User Story 2 — Handle a customer who cannot close digitally (P2)
@@ -54,7 +56,7 @@ Tasks reference work by ID — `AGT-XX`, `MCP-TXX`, `BR-NN`/`FV-NN`, entities/en
 - Within US1: T007 → T008 → T010 → T011 → T012 → T013 in sequence; T009 and T014 alongside once their inputs exist.
 
 ## Parallel Example
-T001, T002 together; T005, T006 together; T014 alongside the US1 agent tasks; T018, T019 together.
+T001, T002 together; T005, T006, T006b together; T014 alongside the US1 agent tasks; T018, T019 together.
 
 ## Implementation Strategy
 MVP-first: complete Setup + Foundational + US1, validate against quickstart.md, then add US2 and

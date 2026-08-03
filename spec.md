@@ -83,6 +83,10 @@ documentation are viewable and the withdrawal/early-repayment entry points are p
   must be shared.
 - The customer has more than one live offer [NEEDS CLARIFICATION: how to prioritize or let the
   customer select among multiple live offers — see research.md].
+- The customer's entity has no valid resolved configuration (brand, product catalog, legal-text
+  templates, locale) — the journey must not be exposed for that entity.
+- The same journey runs for customers of two different entities in the same session/test run —
+  each must see its own entity's brand, product limits, rates, and legal texts, with no bleed.
 - The journey must be completable using only a screen reader and keyboard.
 
 ## Requirements *(mandatory)*
@@ -121,11 +125,27 @@ documentation are viewable and the withdrawal/early-repayment entry points are p
   immutable audit trail.
 - **FR-015**: System MUST stop the flow with a clear message if the offer expires or is revoked
   before signature, and MUST NOT originate a loan from an expired or revoked offer.
+- **FR-016**: System MUST run as a single common journey parameterized per entity, resolving
+  brand, product catalog (amount/term limits, TIN, fees, relationship bonus), legal-text
+  templates (SECCI/INE + contract), and locale from a per-entity configuration; it MUST NOT fork
+  the flow per entity and MUST NOT expose the journey for an entity without a valid configuration.
+- **FR-017**: System MUST apply the customer's entity configuration to every downstream figure
+  and document — simulation limits and rates, disbursement against that entity's IRIS view, and
+  the entity-branded precontractual/contract texts — and MUST keep the common regulatory baseline
+  (precontractual disclosure, verifications, SCA, idempotent disbursement, audit) invariant across
+  entities.
+- **FR-018**: System MUST record the resolved entity on every audited event (acceptance,
+  signature, disbursement) so the audit trail is segmentable per entity.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Customer**: an eligible individual using Ruralvía, holding a live pre-approved offer and one
-  or more accounts.
+- **Entity**: a credit union of Grupo Caja Rural operating the journey on the common Ruralvía
+  channel and IRIS core, with its own configuration (brand, product catalog, legal texts, locale).
+- **EntityConfiguration**: the per-entity parameter set that particularizes the common journey —
+  brand/theme, product catalog limits and rates, relationship-bonus policy, legal-text templates,
+  locale, and feature flags.
+- **Customer**: an eligible individual belonging to an entity and using Ruralvía, holding a live
+  pre-approved offer and one or more accounts.
 - **PreApprovedOffer**: a live, pre-approved financing offer for a customer, with a maximum
   amount, maximum term, nominal rate, and validity.
 - **Simulation**: a configured amount/term with its computed payment and cost figures, derived
@@ -148,6 +168,9 @@ documentation are viewable and the withdrawal/early-repayment entry points are p
   and screen reader only.
 - **SC-005**: A repeated disbursement request for the same fixture loan produces no second
   credit.
+- **SC-006**: The same journey code runs for fixture customers of at least two distinct entities
+  and each renders its own brand, product limits/rates, and legal texts from configuration alone,
+  with no per-entity code path and no cross-entity data bleed.
 
 ## Assumptions
 
@@ -163,4 +186,8 @@ documentation are viewable and the withdrawal/early-repayment entry points are p
   the offer terminal; where a customer has multiple live offers, the default is to use the
   single most recent live offer. Both defaults are flagged for confirmation (see research.md).
 - Product parameters (amounts, terms, rates, fees, bonus) are reference values to be confirmed
-  with RSI.
+  with RSI, and are supplied **per entity** via EntityConfiguration; the MVP seeds at least two
+  entity configurations to prove parametrization without forking the flow.
+- Legal baseline is Ley 16/2011, transitioning to CCD2 (Directive (UE) 2023/2225, application
+  20-Nov-2026); precontractual disclosure, solvency, 14-day withdrawal, early repayment, and TAE
+  hold under both. The Spanish transposition date is to be confirmed with RSI.
